@@ -1,0 +1,51 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+// Prisma Client（TypeScriptのコード生成）の設定
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Userテーブル
+model User {
+  id        String   @id @default(cuid()) // 自動生成のID
+  email     String   @unique // 重複不可のメールアドレス
+  password  String // ハッシュ化したパスワード
+  name      String? // 名前（省略可能）
+  tasks     Task[] // このユーザーのタスク一覧（リレーション）
+  createdAt DateTime @default(now()) // 作成日時（自動設定）
+}
+
+// Taskテーブル
+model Task {
+  id          String    @id @default(cuid())
+  title       String // タスクのタイトル
+  description String? // 詳細説明（省略可能）
+  status      Status    @default(TODO) // ステータス（enumで型安全に）
+  priority    Priority  @default(MEDIUM) // 優先度
+  dueDate     DateTime? // 期日（省略可能）
+  userId      String // どのユーザーのタスクか
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt // 更新のたびに自動更新
+}
+
+// ステータスの選択肢（TypeScriptのunion型と同じ考え方）
+enum Status {
+  TODO // 未着手
+  IN_PROGRESS // 進行中
+  DONE // 完了
+}
+
+// 優先度の選択肢
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
