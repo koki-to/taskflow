@@ -16,8 +16,8 @@ const app = new Hono()
 // Flutter の場合はネイティブアプリなので不要だが、
 // Webでは「どのドメインからのリクエストを受け付けるか」を明示的に指定する必要がある
 app.use('*', cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
+  origin: '*',
+  credentials: false,
 }))
 
 // ログ：リクエストをターミナルに表示する
