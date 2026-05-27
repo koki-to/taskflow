@@ -1,4 +1,3 @@
-// apps/frontend/src/components/task-card.tsx
 'use client'
 
 import { Task, TaskStatus } from '@/types'
@@ -25,27 +24,44 @@ type Props = {
 export function TaskCard({ task }: Props) {
   const deleteTask = useDeleteTask()
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: task.id })
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id })
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+  }
+
+  // ドラッグ中は透明にする（DragOverlayが代わりに表示される）
+  if (isDragging) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="h-24 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50 opacity-50"
+      />
+    )
   }
 
   return (
     <Card
       ref={setNodeRef}
       style={style}
-      className="bg-white cursor-grab active:cursor-grabbing"
+      className="bg-white"
     >
       <CardContent className="p-3">
         <div className="flex items-start gap-2">
+          {/* ドラッグハンドル：ここを掴んでドラッグ */}
           <button
             {...attributes}
             {...listeners}
-            className="text-gray-300 hover:text-gray-500 mt-1 flex-shrink-0"
+            className="text-gray-300 hover:text-gray-500 mt-1 flex-shrink-0 cursor-grab active:cursor-grabbing touch-none"
           >
             <GripVertical className="w-4 h-4" />
           </button>
