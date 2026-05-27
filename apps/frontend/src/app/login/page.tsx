@@ -1,7 +1,6 @@
-// apps/frontend/src/app/login/page.tsx
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -21,13 +20,20 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, user, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
   })
+
+  // ✅ フックをすべて呼んだ後にリダイレクト
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push('/dashboard')
+    }
+  }, [user, authLoading, router])
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true)
@@ -42,6 +48,9 @@ export default function LoginPage() {
       setIsLoading(false)
     }
   }
+
+  // ✅ フックを全部呼んだ後でreturn
+  if (authLoading || user) return null
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

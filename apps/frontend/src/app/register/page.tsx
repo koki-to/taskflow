@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -25,8 +25,16 @@ const registerSchema = z.object({
 type RegisterForm = z.infer<typeof registerSchema>
 
 export default function RegisterPage() {
-  const { register: registerUser } = useAuth()
-  const router = useRouter()
+const { register: registerUser, user, isLoading:authLoading } = useAuth()
+const router = useRouter()
+
+useEffect(() => {
+  if (!authLoading && user) {
+    router.push('/dashboard')
+  }
+}, [user, authLoading, router])
+
+if (authLoading || user) return null
   const [isLoading, setIsLoading] = useState(false)
 
   const { register, handleSubmit, formState: { errors } } = useForm<RegisterForm>({
