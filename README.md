@@ -23,8 +23,7 @@ Flutter 6年のエンジニアが、TypeScript・Node.js・Next.js を独学で�
 
 | ログイン画面              | カンバンボード              |
 | ------------------------- | --------------------------- |
-| ![login](/docs/login.png) | ![kanban](/docs/kanban.png) |
-
+| <img src="https://github.com/user-attachments/assets/a8c60f75-6f12-409a-aa19-7476d2345f0e" width="500" /> | <img src="https://github.com/user-attachments/assets/3bf6e95a-7e73-4818-ac94-15bdfd3d2632" width="500" />
 ---
 
 ## ✨ 機能一覧
