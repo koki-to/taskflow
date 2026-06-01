@@ -19,6 +19,7 @@ model User {
   password  String // ハッシュ化したパスワード
   name      String? // 名前（省略可能）
   tasks     Task[] // このユーザーのタスク一覧（リレーション）
+  tags      Tag[]
   createdAt DateTime @default(now()) // 作成日時（自動設定）
 }
 
@@ -32,8 +33,30 @@ model Task {
   dueDate     DateTime? // 期日（省略可能）
   userId      String // どのユーザーのタスクか
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tags        TaskTag[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt // 更新のたびに自動更新
+}
+
+model Tag {
+  id        String    @id @default(cuid())
+  name      String
+  color     String    @default("#6B7280")
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks     TaskTag[]
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, name])
+}
+
+model TaskTag {
+  taskId String
+  tagId  String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
 }
 
 // ステータスの選択肢（TypeScriptのunion型と同じ考え方）

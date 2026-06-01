@@ -1,9 +1,10 @@
 // apps/backend/src/routes/tasks.ts
 import { Hono } from 'hono'
-import { z } from 'zod'
+import { includes, z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
 import { prisma } from '../lib/prisma'
 import { AppEnv, authMiddleware, JwtPayload } from '../middleware/auth'
+import { auth } from 'hono/utils/basic-auth'
 
 export const taskRoutes = new Hono<AppEnv>()
 
@@ -33,14 +34,27 @@ taskRoutes.get('/', async (c) => {
   const tasks = await prisma.task.findMany({
     where: { userId },              // 自分のタスクだけ取得
     orderBy: { createdAt: 'desc' }, // 新しい順
+    include: {
+      tags: {
+        include: {
+          tag: true
+        }
+      }
+    }
   })
 
-  return c.json({ tasks })
+  const formattedTasks = tasks.map(task => ({
+    ...task,
+    tag: task.tags.map(t => t.tag),
+  }))
+
+  return c.json({ tasks: formattedTasks })
 })
 
 // ── タスク作成 POST /tasks ────────────────────────────────────
 taskRoutes.post(
   '/',
+  authMiddleware,
   zValidator('json', createTaskSchema),
   async (c) => {
     const { userId } = c.get('jwtPayload')
