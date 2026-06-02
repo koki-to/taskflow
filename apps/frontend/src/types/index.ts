@@ -22,6 +22,23 @@ export type User = {
     name:  string | null
 }
 
+export type Tag = {
+    id: string
+    name: string
+    color: string
+    userId: string
+    createdAt: string
+}
+
+export type TaskWithTags = Task & {
+    tags: Tag[]
+}
+
+export type CreateTagInput = {
+    name: string
+    color?: string
+}
+
 // ── リクエスト型 ─────────────────────────────────────
 export type CreateTaskInput = Omit<
     Task, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'status'

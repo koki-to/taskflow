@@ -1,6 +1,6 @@
 'use client'
 
-import { Task, TaskStatus } from '@/types'
+import { Task, TaskWithTags, TaskStatus } from '@/types'
 import { useDeleteTask } from '@/lib/use-tasks'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/button'
 import { Trash2, GripVertical } from 'lucide-react'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
+import { TagBadge } from './tag-badge'
+import { TagManagerDialog } from './tag-manager-dialog'
+import { useRemoveTagFromTask } from '@/lib/use-tags'
 
 const priorityConfig = {
   HIGH:   { label: '高', className: 'bg-red-100 text-red-700' },
@@ -17,12 +20,13 @@ const priorityConfig = {
 }
 
 type Props = {
-  task: Task
+  task:     TaskWithTags  // Task → TaskWithTags に変更
   columnId: TaskStatus
 }
 
 export function TaskCard({ task }: Props) {
-  const deleteTask = useDeleteTask()
+  const deleteTask       = useDeleteTask()
+  const removeTagFromTask = useRemoveTagFromTask()
 
   const {
     attributes,
@@ -33,12 +37,8 @@ export function TaskCard({ task }: Props) {
     isDragging,
   } = useSortable({ id: task.id })
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
+  const style = { transform: CSS.Transform.toString(transform), transition }
 
-  // ドラッグ中は透明にする（DragOverlayが代わりに表示される）
   if (isDragging) {
     return (
       <div
@@ -50,14 +50,11 @@ export function TaskCard({ task }: Props) {
   }
 
   return (
-    <Card
-      ref={setNodeRef}
-      style={style}
-      className="bg-white"
-    >
+    <Card ref={setNodeRef} style={style} className="bg-white">
       <CardContent className="p-3">
         <div className="flex items-start gap-2">
-          {/* ドラッグハンドル：ここを掴んでドラッグ */}
+
+          {/* ドラッグハンドル */}
           <button
             {...attributes}
             {...listeners}
@@ -66,16 +63,17 @@ export function TaskCard({ task }: Props) {
             <GripVertical className="w-4 h-4" />
           </button>
 
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 space-y-1">
             <p className="font-medium text-sm truncate">{task.title}</p>
 
             {task.description && (
-              <p className="text-gray-500 text-xs mt-1 line-clamp-2">
+              <p className="text-gray-500 text-xs line-clamp-2">
                 {task.description}
               </p>
             )}
 
-            <div className="flex items-center gap-2 mt-2">
+            {/* 優先度・期日 */}
+            <div className="flex items-center gap-2">
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${priorityConfig[task.priority].className}`}>
                 {priorityConfig[task.priority].label}
               </span>
@@ -86,16 +84,43 @@ export function TaskCard({ task }: Props) {
                 </span>
               )}
             </div>
+
+            {/* タグ一覧 */}
+            {task.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {task.tags.map((tag) => (
+                  <TagBadge
+                    key={`${task.id}--${tag.id}`}
+                    tag={tag}
+                    onRemove={(tagId) =>
+                      removeTagFromTask.mutate({ taskId: task.id, tagId })
+                    }
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 text-gray-300 hover:text-red-500 flex-shrink-0"
-            onClick={() => deleteTask.mutate(task.id)}
-          >
-            <Trash2 className="w-3 h-3" />
-          </Button>
+          {/* 右側のボタン群 */}
+          <div className="flex flex-col gap-1 flex-shrink-0">
+
+            {/* タグ管理ボタン */}
+            <TagManagerDialog
+              taskId={task.id}
+              taskTags={task.tags}
+            />
+
+            {/* 削除ボタン */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-gray-300 hover:text-red-500"
+              onClick={() => deleteTask.mutate(task.id)}
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          </div>
+
         </div>
       </CardContent>
     </Card>

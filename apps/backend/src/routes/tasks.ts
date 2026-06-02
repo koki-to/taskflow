@@ -45,7 +45,7 @@ taskRoutes.get('/', async (c) => {
 
   const formattedTasks = tasks.map(task => ({
     ...task,
-    tag: task.tags.map(t => t.tag),
+    tags: task.tags.map(t => t.tag),
   }))
 
   return c.json({ tasks: formattedTasks })

@@ -53,7 +53,7 @@ export function CreateTaskDialog({ children }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent>
+      <DialogContent className="bg-white border border-gray-200 shadow-lg">
         <DialogHeader>
           <DialogTitle>タスクを追加</DialogTitle>
         </DialogHeader>
@@ -98,10 +98,13 @@ export function CreateTaskDialog({ children }: Props) {
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
+              className="bg-white border-gray-300 text-gray-700 hover:bg-gray-100"
             >
               キャンセル
             </Button>
-            <Button type="submit" disabled={createTask.isPending}>
+            <Button type="submit"
+                    disabled={createTask.isPending}
+                    className="bg-blue-600 text-white hover:bg-blue-700">
               {createTask.isPending ? '作成中...' : '作成'}
             </Button>
           </div>

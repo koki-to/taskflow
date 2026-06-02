@@ -3,7 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from './api'
-import { Task, TaskStatus, TaskPriority } from '@/types'
+import { Task, TaskStatus, TaskPriority, TaskWithTags } from '@/types'
 
 // TanStack Query は「サーバーの状態管理」ツール
 // Flutter の Riverpod の AsyncNotifier と同じ考え方
@@ -13,7 +13,7 @@ export function useTasks() {
   return useQuery({
     queryKey: ['tasks'],
     queryFn: async () => {
-      const res = await api.get<{ tasks: Task[] }>('/tasks')
+      const res = await api.get<{ tasks: TaskWithTags[] }>('/tasks')
       return res.data.tasks
     },
   })
