@@ -22,6 +22,48 @@ const loginSchema = z.object({
   password: z.string().min(1),
 })
 
+const refreshSchema = z.object({
+  refreshToken: z.string().min(1),
+})
+
+// ── トークン生成ヘルパー ────────────────────────────────────
+//
+// なぜaccessTokenとrefreshTokenを分けるか：
+// → accessToken（短命・15分）
+//   APIリクエストごとに使う・漏洩してもすぐ無効になる
+// → refreshToken（長命・30日）
+//   accessTokenの再発行だけに使う
+//   DBに保存してローテーション管理できる
+//   ログアウト時にDBから削除して無効化できる
+function generateAccessToken(userId: string, email: string): string {
+  return jwt.sign(
+    {userId, email},
+    process.env.JWT_SECRET!,
+    { expiresIn: '15m' }, // 短命：15分
+  )
+}
+
+function generateRefreshToken(userId: string): string {
+  return jwt.sign(
+    { userId },
+    process.env.JWT_REFRESH_SECRET!,
+    { expiresIn: '30d'}
+  )
+}
+
+async function saveRefreshToken(userId: string, refreshToken: string): Promise<void> {
+  const expiresAt = new Date()
+  expiresAt.setDate(expiresAt.getDate() + 30)
+
+  await prisma.refreshToken.create({
+    data: {
+      token:    refreshToken,
+      userId,
+      expiresAt,
+    },
+  })
+}
+
 // ── ユーザー登録 POST /auth/register ──────────────────────────
 authRoutes.post(
   '/register',
@@ -46,15 +88,16 @@ authRoutes.post(
       data: { email, password: hashedPassword, name },
     })
 
-    // JWTトークンを生成
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET!,
-      { expiresIn: '7d' }  // 7日間有効
-    )
+    // トークンを生成
+    const accessToken  = generateAccessToken(user.id, user.email)
+    const refreshToken = generateRefreshToken(user.id)
+
+    // refreshTokenをDBに保存
+    await saveRefreshToken(user.id, refreshToken)
 
     return c.json({
-      token,
+      accessToken,
+      refreshToken,
       user: { id: user.id, email: user.email, name: user.name }
     }, 201)
   }
@@ -80,19 +123,129 @@ authRoutes.post(
       return c.json({ error: 'メールアドレスまたはパスワードが違います' }, 401)
     }
 
-    // JWTトークンを発行
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET!,
-      { expiresIn: '7d' }
-    )
+     // トークンを生成
+    const accessToken  = generateAccessToken(user.id, user.email)
+    const refreshToken = generateRefreshToken(user.id)
+
+    // refreshTokenをDBに保存
+    await saveRefreshToken(user.id, refreshToken)
 
     return c.json({
-      token,
+      accessToken,
+      refreshToken,
       user: { id: user.id, email: user.email, name: user.name }
     })
   }
 )
+
+// ── トークンリフレッシュ POST /auth/refresh ────────────────
+//
+// なぜこのエンドポイントが必要か：
+// → accessTokenは15分で切れる
+// → 切れるたびにログインさせるのはUXが悪い
+// → refreshTokenを使ってaccessTokenを再発行することで
+//   ユーザーは意識せずにログイン状態を維持できる
+authRoutes.post(
+  '/refresh',
+  zValidator('json', refreshSchema),
+  async (c) => {
+    const { refreshToken } = c.req.valid('json')
+
+    // refreshTokenを検証する
+    let payload: { userId: string }
+    try {
+      payload = jwt.verify(
+        refreshToken,
+        process.env.JWT_REFRESH_SECRET!,
+      ) as { userId: string }
+    } catch {
+      return c.json({ error: 'リフレッシュトークンが無効です' }, 401)
+    }
+
+    // DBに保存されているか確認する
+    // → JWTの署名が正しくてもDBに存在しない場合は無効
+    //   （ログアウト済み・削除済みのトークン）
+    const storedToken = await prisma.refreshToken.findUnique({
+      where: { token: refreshToken },
+    })
+
+    if (!storedToken) {
+      return c.json(
+        { error: 'リフレッシュトークンが無効または期限切れです' },
+        401,
+      )
+    }
+
+    // 有効期限を確認する
+    if (storedToken.expiresAt < new Date()) {
+      // 期限切れのトークンをDBから削除する
+      await prisma.refreshToken.delete({
+        where: { token: refreshToken },
+      })
+      return c.json(
+        { error: 'リフレッシュトークンの有効期限が切れています' },
+        401,
+      )
+    }
+
+    // トークンローテーション：
+    // → 使用済みのrefreshTokenを削除して新しいものを発行する
+    // → 同じrefreshTokenが使い回されるのを防ぐセキュリティ対策
+    await prisma.refreshToken.delete({
+      where: { token: refreshToken },
+    })
+
+    // 新しいトークンを生成する
+    const newAccessToken  = generateAccessToken(
+      payload.userId,
+      storedToken.userId,
+    )
+    const newRefreshToken = generateRefreshToken(payload.userId)
+
+    // 新しいrefreshTokenをDBに保存する
+    await saveRefreshToken(payload.userId, newRefreshToken)
+
+    return c.json({
+      accessToken:  newAccessToken,
+      refreshToken: newRefreshToken,
+    })
+  },
+)
+
+// ── ログアウト POST /auth/logout ───────────────────────────
+//
+// なぜログアウトAPIが必要か：
+// → JWTはサーバー側で無効化できない
+// → refreshTokenをDBから削除することで
+//   以後のトークン再発行を防ぐことができる
+// → accessTokenは15分で自然に切れる
+authRoutes.post('/logout', async (c) => {
+  const authHeader = c.req.header('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return c.json({ error: '認証が必要です' }, 401)
+  }
+
+  const accessToken = authHeader.split(' ')[1]
+
+  try {
+    const payload = jwt.verify(
+      accessToken,
+      process.env.JWT_SECRET!,
+    ) as { userId: string }
+
+    // そのユーザーのrefreshTokenを全て削除する
+    // → 全デバイスからログアウトする挙動になる
+    await prisma.refreshToken.deleteMany({
+      where: { userId: payload.userId },
+    })
+
+    return c.json({ message: 'ログアウトしました' })
+  } catch {
+    // accessTokenが無効でもlogoutは成功扱いにする
+    // → クライアント側でトークンを削除してもらえればOK
+    return c.json({ message: 'ログアウトしました' })
+  }
+})
 
 // ── ログイン中ユーザー取得 GET /auth/me ───────────────────────
 authRoutes.get('/me', async (c) => {
